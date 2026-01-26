@@ -24,7 +24,19 @@ WORKDIR /clawdbot
 ARG CLAWDBOT_GIT_REF=main
 RUN git clone --depth 1 --branch "${CLAWDBOT_GIT_REF}" https://github.com/clawdbot/clawdbot.git .
 
-RUN pnpm install --frozen-lockfile
+# Patch: relax version requirements for packages that may reference unpublished versions.
+# Scope this narrowly to avoid surprising dependency mutations.
+RUN set -eux; \
+  for f in \
+    ./extensions/memory-core/package.json \
+    ./extensions/googlechat/package.json \
+  ; do \
+    if [ -f "$f" ]; then \
+      sed -i -E 's/"clawdbot"[[:space:]]*:[[:space:]]*">=[^"]+"/"clawdbot": "*"/g' "$f"; \
+    fi; \
+  done
+
+RUN pnpm install --no-frozen-lockfile
 RUN pnpm build
 ENV CLAWDBOT_PREFER_PNPM=1
 RUN pnpm ui:install && pnpm ui:build
@@ -54,5 +66,6 @@ RUN printf '%s\n' '#!/usr/bin/env bash' 'exec node /clawdbot/dist/entry.js "$@"'
 
 COPY src ./src
 
+ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "src/server.js"]
