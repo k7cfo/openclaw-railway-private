@@ -20,6 +20,11 @@
   var configSaveEl = document.getElementById('configSave');
   var configOutEl = document.getElementById('configOut');
 
+  // Import
+  var importFileEl = document.getElementById('importFile');
+  var importRunEl = document.getElementById('importRun');
+  var importOutEl = document.getElementById('importOut');
+
   function setStatus(s) {
     statusEl.textContent = s;
   }
@@ -172,6 +177,38 @@
 
   if (configReloadEl) configReloadEl.onclick = loadConfigRaw;
   if (configSaveEl) configSaveEl.onclick = saveConfigRaw;
+
+  // Import backup
+  function runImport() {
+    if (!importRunEl || !importFileEl) return;
+    var f = importFileEl.files && importFileEl.files[0];
+    if (!f) {
+      alert('Pick a .tar.gz file first');
+      return;
+    }
+    if (!confirm('Import backup? This overwrites files under /data and restarts the gateway.')) return;
+
+    if (importOutEl) importOutEl.textContent = 'Uploading ' + f.name + ' (' + f.size + ' bytes)...\n';
+
+    return f.arrayBuffer().then(function (buf) {
+      return fetch('/setup/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/gzip' },
+        body: buf
+      });
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        if (importOutEl) importOutEl.textContent += t + '\n';
+        if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + t);
+        return refreshStatus();
+      });
+    }).catch(function (e) {
+      if (importOutEl) importOutEl.textContent += '\nError: ' + String(e) + '\n';
+    });
+  }
+
+  if (importRunEl) importRunEl.onclick = runImport;
 
   // Pairing approve helper
   var pairingBtn = document.getElementById('pairingApprove');

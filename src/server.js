@@ -264,6 +264,13 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
       &nbsp;|&nbsp;
       <a href="/setup/export" target="_blank">Download backup (.tar.gz)</a>
     </div>
+
+    <div style="margin-top: 0.75rem">
+      <div class="muted" style="margin-bottom:0.25rem"><strong>Import backup</strong> (advanced): restores into <code>/data</code> and restarts the gateway.</div>
+      <input id="importFile" type="file" accept=".tar.gz,application/gzip" />
+      <button id="importRun" style="background:#7c2d12; margin-top:0.5rem">Import</button>
+      <pre id="importOut" style="white-space:pre-wrap"></pre>
+    </div>
   </div>
 
   <div class="card">
@@ -833,6 +840,95 @@ app.get("/setup/export", requireSetupAuth, async (_req, res) => {
   });
 
   stream.pipe(res);
+});
+
+function isUnderDir(p, root) {
+  const abs = path.resolve(p);
+  const r = path.resolve(root);
+  return abs === r || abs.startsWith(r + path.sep);
+}
+
+function looksSafeTarPath(p) {
+  if (!p) return false;
+  // tar paths always use / separators
+  if (p.startsWith("/") || p.startsWith("\\")) return false;
+  // windows drive letters
+  if (/^[A-Za-z]:[\\/]/.test(p)) return false;
+  // path traversal
+  if (p.split("/").includes("..")) return false;
+  return true;
+}
+
+async function readBodyBuffer(req, maxBytes) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    req.on("data", (chunk) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        reject(new Error("payload too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+// Import a backup created by /setup/export.
+// This is intentionally limited to restoring into /data to avoid overwriting arbitrary host paths.
+app.post("/setup/import", requireSetupAuth, async (req, res) => {
+  try {
+    const dataRoot = "/data";
+    if (!isUnderDir(STATE_DIR, dataRoot) || !isUnderDir(WORKSPACE_DIR, dataRoot)) {
+      return res
+        .status(400)
+        .type("text/plain")
+        .send("Import is only supported when OPENCLAW_STATE_DIR and OPENCLAW_WORKSPACE_DIR are under /data (Railway volume).\n");
+    }
+
+    // Stop gateway before restore so we don't overwrite live files.
+    if (gatewayProc) {
+      try { gatewayProc.kill("SIGTERM"); } catch {}
+      await sleep(750);
+      gatewayProc = null;
+    }
+
+    const buf = await readBodyBuffer(req, 250 * 1024 * 1024); // 250MB max
+    if (!buf.length) return res.status(400).type("text/plain").send("Empty body\n");
+
+    // Extract into /data.
+    // We only allow safe relative paths, and we intentionally do NOT delete existing files.
+    // (Users can reset/redeploy or manually clean the volume if desired.)
+    const tmpPath = path.join(os.tmpdir(), `openclaw-import-${Date.now()}.tar.gz`);
+    fs.writeFileSync(tmpPath, buf);
+
+    await tar.x({
+      file: tmpPath,
+      cwd: dataRoot,
+      gzip: true,
+      strict: true,
+      onwarn: () => {},
+      filter: (p) => {
+        // Allow only paths that look safe.
+        return looksSafeTarPath(p);
+      },
+    });
+
+    try { fs.rmSync(tmpPath, { force: true }); } catch {}
+
+    // Restart gateway after restore.
+    if (isConfigured()) {
+      await restartGateway();
+    }
+
+    res.type("text/plain").send("OK - imported backup into /data and restarted gateway.\n");
+  } catch (err) {
+    console.error("[import]", err);
+    res.status(500).type("text/plain").send(String(err));
+  }
 });
 
 // Proxy everything else to the gateway.
