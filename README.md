@@ -2,6 +2,18 @@
 
 This repo packages **OpenClaw** for Railway with a small **/setup** web wizard so users can deploy and onboard **without running any commands**.
 
+## Official template / endorsements
+
+- Officially recommended by OpenClaw: https://docs.openclaw.ai/railway
+- Adopted as the **Official Railway template** for OpenClaw deployment: https://x.com/railway/status/2015534958925013438
+  - Screenshot: *(TODO: add image — X blocks automated fetch; please provide a screenshot file we can commit)*
+- Endorsed by Jake Cooper (CEO, Railway): https://x.com/justjake/status/2015536083514405182
+  - Screenshot: *(TODO: add image — X blocks automated fetch; please provide a screenshot file we can commit)*
+- Created and maintained by **Vignesh N (@vignesh07)**
+- **1800+ deploys on Railway and counting**
+
+![Railway template deploy count](assets/railway-deploys.jpg)
+
 ## What you get
 
 - **OpenClaw Gateway + Control UI** (served at `/` and `/openclaw`)
