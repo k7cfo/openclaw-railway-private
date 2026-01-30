@@ -2,22 +2,6 @@
 
 This repo packages **OpenClaw** for Railway with a small **/setup** web wizard so users can deploy and onboard **without running any commands**.
 
-## Official template / endorsements
-
-- Officially recommended by OpenClaw: <https://docs.openclaw.ai/railway>
-- Railway announcement (official): [Railway tweet announcing 1‑click OpenClaw deploy](https://x.com/railway/status/2015534958925013438)
-
-  ![Railway official tweet screenshot](assets/railway-official-tweet.jpg)
-
-- Endorsement from Railway CEO: [Jake Cooper tweet endorsing the OpenClaw Railway template](https://x.com/justjake/status/2015536083514405182)
-
-  ![Jake Cooper endorsement tweet screenshot](assets/railway-ceo-endorsement.jpg)
-
-- Created and maintained by **Vignesh N (@vignesh07)**
-- **1800+ deploys on Railway and counting**
-
-![Railway template deploy count](assets/railway-deploys.jpg)
-
 ## What you get
 
 - **OpenClaw Gateway + Control UI** (served at `/` and `/openclaw`)
@@ -92,3 +76,21 @@ docker run --rm -p 8080:8080 \
 
 # open http://localhost:8080/setup (password: test)
 ```
+
+---
+
+## Official template / endorsements
+
+- Officially recommended by OpenClaw: <https://docs.openclaw.ai/railway>
+- Railway announcement (official): [Railway tweet announcing 1‑click OpenClaw deploy](https://x.com/railway/status/2015534958925013438)
+
+  ![Railway official tweet screenshot](assets/railway-official-tweet.jpg)
+
+- Endorsement from Railway CEO: [Jake Cooper tweet endorsing the OpenClaw Railway template](https://x.com/justjake/status/2015536083514405182)
+
+  ![Jake Cooper endorsement tweet screenshot](assets/railway-ceo-endorsement.jpg)
+
+- Created and maintained by **Vignesh N (@vignesh07)**
+- **1800+ deploys on Railway and counting**
+
+![Railway template deploy count](assets/railway-deploys.jpg)
