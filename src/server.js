@@ -636,6 +636,8 @@ function buildOnboardArgs(payload) {
 
 function runCmd(cmd, args, opts = {}) {
   return new Promise((resolve) => {
+    const timeoutMs = Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : 120_000;
+
     const proc = childProcess.spawn(cmd, args, {
       ...opts,
       env: {
@@ -649,12 +651,25 @@ function runCmd(cmd, args, opts = {}) {
     proc.stdout?.on("data", (d) => (out += d.toString("utf8")));
     proc.stderr?.on("data", (d) => (out += d.toString("utf8")));
 
+    const timer = setTimeout(() => {
+      try { proc.kill("SIGTERM"); } catch {}
+      setTimeout(() => {
+        try { proc.kill("SIGKILL"); } catch {}
+      }, 2_000);
+      out += `\n[timeout] Command exceeded ${timeoutMs}ms and was terminated.\n`;
+      resolve({ code: 124, output: out });
+    }, timeoutMs);
+
     proc.on("error", (err) => {
+      clearTimeout(timer);
       out += `\n[spawn error] ${String(err)}\n`;
       resolve({ code: 127, output: out });
     });
 
-    proc.on("close", (code) => resolve({ code: code ?? 0, output: out }));
+    proc.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ code: code ?? 0, output: out });
+    });
   });
 }
 
@@ -1055,14 +1070,26 @@ app.post("/setup/api/devices/approve", requireSetupAuth, async (req, res) => {
 });
 
 app.post("/setup/api/reset", requireSetupAuth, async (_req, res) => {
-  // Minimal reset: delete the config file so /setup can rerun.
+  // Reset: stop gateway (frees memory) + delete config file(s) so /setup can rerun.
   // Keep credentials/sessions/workspace by default.
   try {
+    // Stop gateway to avoid running gateway + onboard concurrently on small Railway instances.
+    try {
+      if (gatewayProc) {
+        try { gatewayProc.kill("SIGTERM"); } catch {}
+        await sleep(750);
+        gatewayProc = null;
+      }
+    } catch {
+      // ignore
+    }
+
     const candidates = typeof resolveConfigCandidates === "function" ? resolveConfigCandidates() : [configPath()];
     for (const p of candidates) {
       try { fs.rmSync(p, { force: true }); } catch {}
     }
-    res.type("text/plain").send("OK - deleted config file(s). You can rerun setup now.");
+
+    res.type("text/plain").send("OK - stopped gateway and deleted config file(s). You can rerun setup now.");
   } catch (err) {
     res.status(500).type("text/plain").send(String(err));
   }
