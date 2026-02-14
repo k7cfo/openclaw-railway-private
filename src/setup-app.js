@@ -46,7 +46,8 @@
       advancedToggle.style.display = 'block';
       advancedToggle.style.marginTop = '0.5rem';
       advancedToggle.innerHTML = '<input type="checkbox" id="showAdvancedAuth" /> Show interactive OAuth options (advanced)';
-      authGroupEl.parentNode.insertBefore(advancedToggle, authChoiceEl.parentNode);
+      // Insert before authChoiceEl (not its parentNode) to avoid DOM error
+      authGroupEl.parentNode.insertBefore(advancedToggle, authChoiceEl);
     }
 
     for (var i = 0; i < groups.length; i++) {
@@ -118,7 +119,13 @@
         statusDetailsEl.textContent = parts.join('\n');
       }
 
-      renderAuth(j.authGroups || []);
+      // Use fallback auth groups if API returns empty/missing authGroups
+      if (j.authGroups && j.authGroups.length > 0) {
+        renderAuth(j.authGroups);
+      } else {
+        console.warn('[setup] authGroups missing or empty, fetching fallback');
+        renderAuthFallback();
+      }
 
       // If channels are unsupported, surface it for debugging.
       if (j.channelsAddHelp && j.channelsAddHelp.indexOf('telegram') === -1) {
@@ -133,6 +140,23 @@
     }).catch(function (e) {
       setStatus('Error: ' + String(e));
       if (statusDetailsEl) statusDetailsEl.textContent = '';
+      // Render default auth groups even on error so setup can proceed
+      renderAuthFallback();
+    });
+  }
+
+  // Fallback auth groups in case the status API fails.
+  // Keep the source of truth on the server (avoids drift).
+  function renderAuthFallback() {
+    return httpJson('/setup/api/auth-groups').then(function (j) {
+      if (j && j.authGroups && j.authGroups.length > 0) {
+        renderAuth(j.authGroups);
+        return;
+      }
+      throw new Error('Missing authGroups from /setup/api/auth-groups');
+    }).catch(function (e) {
+      console.warn('[setup] authGroups fallback failed:', e);
+      renderAuth([]);
     });
   }
 
