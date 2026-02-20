@@ -44,6 +44,7 @@ Notes:
 
 Then:
 - Visit `https://<your-app>.up.railway.app/setup`
+- Log in with username **`admin`** and the password you set in `SETUP_PASSWORD`
 - Complete setup
 - Visit `https://<your-app>.up.railway.app/` and `/openclaw`
 
@@ -88,8 +89,12 @@ This fork binds the wrapper to `::` (dual-stack IPv4+IPv6), which enables Railwa
 **6. Access privately**
 ```bash
 curl http://<service-name>.railway.internal:8080
-# e.g. http://clawdbot-railway-template.railway.internal:8080/setup
+# e.g. http://openclaw-private.railway.internal:8080/setup
 ```
+
+Log in to the setup wizard with:
+- **Username:** `admin`
+- **Password:** the `SETUP_PASSWORD` you set in your environment variables
 
 All devices on your Tailscale tailnet can now reach your OpenClaw instance — no public internet exposure.
 
