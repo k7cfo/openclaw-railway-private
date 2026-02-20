@@ -1319,13 +1319,21 @@ const proxy = httpProxy.createProxyServer({
   xfwd: true,
 });
 
+// When FORCE_HTTPS_PROTO is enabled, rewrite protocol-related headers so the
+// OpenClaw gateway believes the connection is HTTPS. This is necessary because
+// the gateway checks the Origin header on WebSocket upgrades and rejects non-
+// secure origins. Tailscale encrypts the tunnel, so this is safe.
+function rewriteHttpsHeaders(proxyReq) {
+  proxyReq.setHeader("x-forwarded-proto", "https");
+  const origin = proxyReq.getHeader("origin");
+  if (origin && origin.startsWith("http://")) {
+    proxyReq.setHeader("origin", origin.replace(/^http:\/\//, "https://"));
+  }
+}
+
 if (FORCE_HTTPS_PROTO) {
-  proxy.on("proxyReq", (_proxyReq, req) => {
-    _proxyReq.setHeader("x-forwarded-proto", "https");
-  });
-  proxy.on("proxyReqWs", (_proxyReq) => {
-    _proxyReq.setHeader("x-forwarded-proto", "https");
-  });
+  proxy.on("proxyReq", rewriteHttpsHeaders);
+  proxy.on("proxyReqWs", rewriteHttpsHeaders);
 }
 
 proxy.on("error", (err, _req, res) => {
