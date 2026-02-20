@@ -1395,6 +1395,21 @@ const server = app.listen(PORT, BIND_HOST, async () => {
     console.warn("[wrapper] WARNING: SETUP_PASSWORD is not set; /setup will error.");
   }
 
+  // Seed AGENTS.md into the workspace on first boot so the AI model knows about
+  // Railway persistence rules (/data is the only persistent path).
+  // Users can edit or delete this file; it is only created if missing.
+  const agentsMdPath = path.join(WORKSPACE_DIR, "AGENTS.md");
+  const agentsMdTemplate = path.join("/app", "templates", "AGENTS.md");
+  try {
+    if (!fs.existsSync(agentsMdPath) && fs.existsSync(agentsMdTemplate)) {
+      fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+      fs.copyFileSync(agentsMdTemplate, agentsMdPath);
+      console.log(`[wrapper] seeded ${agentsMdPath} from template`);
+    }
+  } catch (err) {
+    console.warn(`[wrapper] failed to seed AGENTS.md: ${err}`);
+  }
+
   // Optional operator hook to install/persist extra tools under /data.
   // This is intentionally best-effort and should be used to set up persistent
   // prefixes (npm/pnpm/python venv), not to mutate the base image.
