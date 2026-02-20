@@ -749,7 +749,15 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     // remains correct when X-Forwarded-* headers are present.
     await runCmd(
       OPENCLAW_NODE,
-      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"]) ]),
+      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["*********"]) ]),
+    );
+
+    // Allow Control UI over plain HTTP (Tailscale encrypts the tunnel).
+    // Without this, the browser's non-secure context blocks WebCrypto and the
+    // gateway rejects the connection with "requires HTTPS or localhost".
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]),
     );
 
     // Optional: configure a custom OpenAI-compatible provider (base URL) for advanced users.
@@ -976,6 +984,7 @@ const ALLOWED_CONSOLE_COMMANDS = new Set([
   "openclaw.doctor",
   "openclaw.logs.tail",
   "openclaw.config.get",
+  "openclaw.config.set",
 
   // Device management (for fixing "disconnected (1008): pairing required")
   "openclaw.devices.list",
@@ -1037,6 +1046,16 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
     if (cmd === "openclaw.config.get") {
       if (!arg) return res.status(400).json({ ok: false, error: "Missing config path" });
       const r = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", arg]));
+      return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
+    }
+    if (cmd === "openclaw.config.set") {
+      if (!arg) return res.status(400).json({ ok: false, error: "Missing config path=value" });
+      // arg format: "path value" (space-separated)
+      const spaceIdx = arg.indexOf(" ");
+      if (spaceIdx === -1) return res.status(400).json({ ok: false, error: "Format: path value" });
+      const cfgPath = arg.slice(0, spaceIdx);
+      const cfgValue = arg.slice(spaceIdx + 1);
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", cfgPath, cfgValue]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
 
@@ -1439,6 +1458,14 @@ const server = app.listen(PORT, BIND_HOST, async () => {
     } catch (err) {
       console.warn(`[wrapper] bootstrap failed (continuing): ${String(err)}`);
     }
+  }
+
+  // Ensure allowInsecureAuth is set for Tailscale/HTTP access (idempotent).
+  if (isConfigured()) {
+    try {
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]));
+      console.log("[wrapper] ensured gateway.controlUi.allowInsecureAuth=true");
+    } catch {}
   }
 
   // Auto-start the gateway if already configured so polling channels (Telegram/Discord/etc.)
