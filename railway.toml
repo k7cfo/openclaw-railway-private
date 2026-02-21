@@ -6,8 +6,8 @@ healthcheckPath = "/setup/healthz"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
-# Require a persistent volume mounted at /data (Railway).
-requiredMountPath = "/data"
+# Volume at /data is provisioned by the Railway template.
+# Do not use requiredMountPath here — it blocks template deploys.
 
 [variables]
 # NOTE: Railway injects PORT automatically.
