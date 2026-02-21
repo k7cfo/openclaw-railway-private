@@ -180,6 +180,12 @@
       var j;
       try { j = JSON.parse(text); } catch (_e) { j = { ok: false, output: text }; }
       logEl.textContent += (j.output || JSON.stringify(j, null, 2));
+
+      // Show the dashboard link box if setup succeeded and we have a URL.
+      if (j.ok && j.dashboardUrl) {
+        showDashboardLink(j.dashboardUrl);
+      }
+
       return refreshStatus();
     }).catch(function (e) {
       logEl.textContent += '\nError: ' + String(e) + '\n';
@@ -364,9 +370,50 @@
       .catch(function (e) { logEl.textContent += 'Error: ' + String(e) + '\n'; });
   };
 
+  // Dashboard link helpers
+  function showDashboardLink(url) {
+    var box = document.getElementById('dashboardLinkBox');
+    var linkInput = document.getElementById('dashboardLink');
+    var copyBtn = document.getElementById('copyDashLink');
+    var openLink = document.getElementById('openDashLink');
+    if (!box || !linkInput) return;
+
+    linkInput.value = url;
+    if (openLink) openLink.href = url;
+    box.style.display = 'block';
+
+    if (copyBtn) {
+      copyBtn.onclick = function () {
+        navigator.clipboard.writeText(url).then(function () {
+          copyBtn.textContent = '\u2705 Copied!';
+          setTimeout(function () { copyBtn.textContent = '\ud83d\udccb Copy link'; }, 2000);
+        }).catch(function () {
+          linkInput.select();
+        });
+      };
+    }
+
+    // Auto-select on click for easy manual copy
+    linkInput.onclick = function () { linkInput.select(); };
+  }
+
+  // If already configured, fetch and show the dashboard link.
+  function loadDashboardLinkIfConfigured() {
+    return httpJson('/setup/api/dashboard-url').then(function (j) {
+      if (j.ok && j.dashboardUrl) {
+        showDashboardLink(j.dashboardUrl);
+      }
+    }).catch(function () { /* ignore */ });
+  }
+
   // Populate provider/auth selects ASAP (fast endpoint, no subprocesses)
   loadAuthGroupsFast();
 
   // Load the rest of status (version/help) in parallel
   refreshStatus();
+
+  // If setup was already completed, show the dashboard link.
+  httpJson('/setup/api/status').then(function (j) {
+    if (j.configured) loadDashboardLinkIfConfigured();
+  }).catch(function () {});
 })();
