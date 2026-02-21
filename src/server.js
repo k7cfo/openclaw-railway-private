@@ -161,12 +161,14 @@ function tryAppendRailwayPersistence() {
     const existing = fs.readFileSync(agentsMdPath, "utf8");
     if (existing.includes(PERSISTENCE_MARKER)) {
       persistenceAppended = true;
+      seedWorkspaceTemplates();
       return true;
     }
     const template = fs.readFileSync(PERSISTENCE_TEMPLATE_PATH, "utf8");
     fs.appendFileSync(agentsMdPath, "\n\n" + template, "utf8");
     console.log(`[wrapper] appended Railway persistence rules to ${agentsMdPath}`);
     persistenceAppended = true;
+    seedWorkspaceTemplates();
     return true;
   } catch (err) {
     console.warn(`[wrapper] persistence append failed (non-fatal): ${err}`);
@@ -175,24 +177,31 @@ function tryAppendRailwayPersistence() {
 }
 
 const BOOTSTRAP_TEMPLATE_PATH = path.join("/app", "templates", "workspace", "BOOTSTRAP.md");
+const HEARTBEAT_TEMPLATE_PATH = path.join("/app", "templates", "workspace", "HEARTBEAT.md");
+const TOOLS_TEMPLATE_PATH = path.join("/app", "templates", "workspace", "TOOLS.md");
 
-function seedCustomBootstrap() {
-  const bootstrapMdPath = path.join(WORKSPACE_DIR, "BOOTSTRAP.md");
+function seedWorkspaceTemplate(templatePath, filename) {
+  const destPath = path.join(WORKSPACE_DIR, filename);
   try {
-    if (fs.existsSync(bootstrapMdPath)) return; // already exists (workspace not new)
-    if (!fs.existsSync(BOOTSTRAP_TEMPLATE_PATH)) {
-      console.warn("[wrapper] custom BOOTSTRAP.md template not found; OpenClaw will use its stock version");
-      return;
-    }
-    const content = fs.readFileSync(BOOTSTRAP_TEMPLATE_PATH, "utf8");
-    fs.writeFileSync(bootstrapMdPath, content, { encoding: "utf8", flag: "wx" });
-    console.log(`[wrapper] seeded custom BOOTSTRAP.md in workspace`);
+    if (fs.existsSync(destPath)) return; // already exists
+    if (!fs.existsSync(templatePath)) return;
+    const content = fs.readFileSync(templatePath, "utf8");
+    fs.writeFileSync(destPath, content, { encoding: "utf8", flag: "wx" });
+    console.log(`[wrapper] seeded ${filename} in workspace`);
   } catch (err) {
-    // EEXIST is fine (race condition); anything else is non-fatal.
     if (err?.code !== "EEXIST") {
-      console.warn(`[wrapper] BOOTSTRAP.md seed failed (non-fatal): ${err}`);
+      console.warn(`[wrapper] ${filename} seed failed (non-fatal): ${err}`);
     }
   }
+}
+
+function seedCustomBootstrap() {
+  seedWorkspaceTemplate(BOOTSTRAP_TEMPLATE_PATH, "BOOTSTRAP.md");
+}
+
+function seedWorkspaceTemplates() {
+  seedWorkspaceTemplate(HEARTBEAT_TEMPLATE_PATH, "HEARTBEAT.md");
+  seedWorkspaceTemplate(TOOLS_TEMPLATE_PATH, "TOOLS.md");
 }
 
 function appendRailwayPersistenceRules() {
@@ -642,6 +651,19 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
       <option value="advanced">advanced</option>
       <option value="manual">manual</option>
     </select>
+
+    <div id="openrouterModelPresetBox" style="display:none; margin-top:1rem; padding:0.75rem; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px">
+      <label><strong>OpenRouter model preset</strong></label>
+      <p class="muted" style="margin:0.25rem 0 0.5rem 0">Pick a starting model configuration. You can switch models anytime via <code>/model</code> in chat.</p>
+      <select id="openrouterPreset">
+        <option value="quality">Quality — Sonnet 4.5 + DeepSeek fallback ($3–15/MTok)</option>
+        <option value="balanced" selected>Balanced — DeepSeek V3.2 + Haiku fallback ($0.26–5/MTok)</option>
+        <option value="budget">Budget — DeepSeek V3.2 only ($0.26–0.38/MTok)</option>
+      </select>
+      <div class="muted" style="margin-top:0.25rem; font-size:0.85rem">
+        All presets include 10 switchable models: Opus, Codex, Sonnet, Gemini Flash, Kimi, GLM, MiniMax, DeepSeek, Haiku, Qwen Coder. Free image models included.
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -757,6 +779,32 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
 </body>
 </html>`);
 });
+
+// OpenRouter model presets — injected post-onboard when user selects OpenRouter.
+const OPENROUTER_MODEL_CATALOG = {
+  "openrouter/anthropic/claude-opus-4-6": { alias: "Opus" },
+  "openrouter/openai/gpt-5.2-codex": { alias: "Codex" },
+  "openrouter/anthropic/claude-sonnet-4-5": { alias: "Sonnet" },
+  "openrouter/google/gemini-3-flash-preview": { alias: "Gemini Flash" },
+  "openrouter/moonshotai/kimi-k2.5": { alias: "Kimi" },
+  "openrouter/zai/glm-5": { alias: "GLM" },
+  "openrouter/minimax/minimax-m2.5": { alias: "MiniMax" },
+  "openrouter/deepseek/deepseek-v3.2": { alias: "DeepSeek" },
+  "openrouter/anthropic/claude-haiku-4-5": { alias: "Haiku" },
+  "openrouter/qwen/qwen3-coder-480b-a35b-instruct": { alias: "Qwen Coder" },
+};
+
+const OPENROUTER_PRESETS = {
+  quality: {
+    model: { primary: "openrouter/anthropic/claude-sonnet-4-5", fallbacks: ["openrouter/deepseek/deepseek-v3.2"] },
+  },
+  balanced: {
+    model: { primary: "openrouter/deepseek/deepseek-v3.2", fallbacks: ["openrouter/anthropic/claude-haiku-4-5"] },
+  },
+  budget: {
+    model: { primary: "openrouter/deepseek/deepseek-v3.2" },
+  },
+};
 
 const AUTH_GROUPS = [
   { value: "openai", label: "OpenAI", hint: "Codex OAuth + API key", options: [
@@ -1146,6 +1194,72 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         extra += `[telegram-permissions] set exec ask=off, security=full, elevated=enabled\n`;
       }
     }
+
+    // --- OpenRouter model presets + memory/heartbeat config ---
+    // Only apply when the user selected OpenRouter as their auth provider.
+    const isOpenRouter = payload.authChoice === "openrouter-api-key";
+    if (isOpenRouter) {
+      const presetName = payload.openrouterPreset || "balanced";
+      const preset = OPENROUTER_PRESETS[presetName] || OPENROUTER_PRESETS.balanced;
+      extra += `\n[openrouter-models] applying preset: ${presetName}\n`;
+
+      // Primary + fallback model.
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.model", JSON.stringify(preset.model)]));
+
+      // Full model catalog (allowlist with aliases for /model command).
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.models", JSON.stringify(OPENROUTER_MODEL_CATALOG)]));
+
+      // Free image models.
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.imageModel", JSON.stringify({
+        primary: "openrouter/qwen/qwen-2.5-vl-72b-instruct:free",
+        fallbacks: ["openrouter/google/gemini-2.0-flash-vision:free"],
+      })]));
+
+      // Heartbeat with cheap model.
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.heartbeat", JSON.stringify({
+        every: "30m",
+        model: "openrouter/anthropic/claude-haiku-4-5",
+        target: "last",
+      })]));
+
+      extra += `[openrouter-models] model=${preset.model.primary}, catalog=${Object.keys(OPENROUTER_MODEL_CATALOG).length} models, heartbeat=haiku\n`;
+    }
+
+    // --- Memory configuration (all providers) ---
+    // Memory flush: triggers a silent turn before compaction to write durable memories.
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.compaction", JSON.stringify({
+      mode: "safeguard",
+      reserveTokensFloor: 24000,
+      memoryFlush: {
+        enabled: true,
+        softThresholdTokens: 6000,
+        systemPrompt: "Session nearing compaction. Store durable memories now.",
+        prompt: "Write any lasting notes to memory/YYYY-MM-DD.md; reply with NO_REPLY if nothing to store.",
+      },
+    })]));
+
+    // Context pruning: prune stale tool results from context.
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.contextPruning", JSON.stringify({
+      mode: "cache-ttl",
+      ttl: "2h",
+      keepLastAssistants: 3,
+    })]));
+
+    // Hybrid memory search: BM25 + vectors with MMR dedup and temporal decay.
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.memorySearch", JSON.stringify({
+      sources: ["memory", "sessions"],
+      query: {
+        hybrid: {
+          enabled: true,
+          vectorWeight: 0.7,
+          textWeight: 0.3,
+          mmr: { enabled: true, lambda: 0.7 },
+          temporalDecay: { enabled: true, halfLifeDays: 30 },
+        },
+      },
+    })]));
+
+    extra += `\n[memory] compaction safeguard + memoryFlush enabled, contextPruning 2h, hybrid search on\n`;
 
     // Persist Brave Search API key (if provided) so the gateway can use web search.
     if (payload.braveApiKey?.trim()) {

@@ -84,11 +84,21 @@
       if (firstNonInteractive) authChoiceEl.value = firstNonInteractive;
     }
 
-    authGroupEl.onchange = rerenderChoices;
+    authGroupEl.onchange = function () {
+      rerenderChoices();
+      toggleOpenrouterPreset();
+    };
     var advEl = document.getElementById('showAdvancedAuth');
     if (advEl) advEl.onchange = rerenderChoices;
 
     rerenderChoices();
+    toggleOpenrouterPreset();
+  }
+
+  function toggleOpenrouterPreset() {
+    var box = document.getElementById('openrouterModelPresetBox');
+    if (!box || !authGroupEl) return;
+    box.style.display = (authGroupEl.value === 'openrouter') ? 'block' : 'none';
   }
 
   function httpJson(url, opts) {
@@ -165,7 +175,9 @@
       customProviderBaseUrl: document.getElementById('customProviderBaseUrl').value,
       customProviderApi: document.getElementById('customProviderApi').value,
       customProviderApiKeyEnv: document.getElementById('customProviderApiKeyEnv').value,
-      customProviderModelId: document.getElementById('customProviderModelId').value
+      customProviderModelId: document.getElementById('customProviderModelId').value,
+
+      openrouterPreset: document.getElementById('openrouterPreset') ? document.getElementById('openrouterPreset').value : ''
     };
 
     logEl.textContent = 'Running...\n';
