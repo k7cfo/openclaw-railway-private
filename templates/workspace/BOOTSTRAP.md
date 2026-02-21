@@ -24,7 +24,6 @@ Work through these together — don't rush, one at a time:
 
 Once you know who YOU are, learn about your human:
 - **Their name** — What should you call them?
-- **Pronouns** — if they want to share
 - **Timezone** — so you know when it's 3am for them
 - **What they care about** — projects, interests, anything they want you to know
 

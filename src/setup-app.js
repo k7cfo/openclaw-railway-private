@@ -159,6 +159,7 @@
       discordToken: document.getElementById('discordToken').value,
       slackBotToken: document.getElementById('slackBotToken').value,
       slackAppToken: document.getElementById('slackAppToken').value,
+      telegramPermissions: document.getElementById('telegramPermissions').value,
 
       customProviderId: document.getElementById('customProviderId').value,
       customProviderBaseUrl: document.getElementById('customProviderBaseUrl').value,

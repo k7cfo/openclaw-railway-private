@@ -687,6 +687,18 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
       Get it from BotFather: open Telegram, message <code>@BotFather</code>, run <code>/newbot</code>, then copy the token.
     </div>
 
+    <label>Telegram permissions preset</label>
+    <select id="telegramPermissions">
+      <option value="restrictive">Restrictive (default) — sandbox exec, approval required</option>
+      <option value="standard">Standard (recommended for VPS) — gateway exec, auto-approve safe commands</option>
+      <option value="full">Full Access (⚠️ trusted users only) — auto-approve all, full exec, all Telegram actions</option>
+    </select>
+    <div class="muted" style="margin-top: 0.25rem">
+      <strong>Restrictive:</strong> Commands run in sandbox, approval needed for each. Telegram actions limited.<br/>
+      <strong>Standard:</strong> Commands run on host, safe commands auto-approved, dangerous ones still ask. Telegram actions enabled.<br/>
+      <strong>Full Access:</strong> All commands auto-approved, full security tier, elevated mode enabled, all Telegram actions (reactions, stickers, deletes). Only for fully trusted users.
+    </div>
+
     <label>Discord bot token (optional)</label>
     <input id="discordToken" type="password" placeholder="Bot token" />
     <div class="muted" style="margin-top: 0.25rem">
@@ -1098,6 +1110,40 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.slack"]));
         extra += `\n[slack config] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
         extra += `\n[slack verify] exit=${get.code} (output ${get.output.length} chars)\n${get.output || "(no output)"}`;
+      }
+    }
+
+    // Apply Telegram permissions preset (if provided).
+    if (payload.telegramPermissions && payload.telegramPermissions !== "restrictive") {
+      const preset = payload.telegramPermissions;
+      extra += `\n[telegram-permissions] applying preset: ${preset}\n`;
+
+      if (preset === "standard" || preset === "full") {
+        // Run exec on gateway host (not sandbox — Railway doesn't have Docker-in-Docker).
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "tools.exec.host", "gateway"]));
+        // Disable sandbox mode (no Docker available on Railway).
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "agents.defaults.sandbox.mode", "off"]));
+        // Enable Telegram actions.
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "channels.telegram.actions.reactions", "true"]));
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "channels.telegram.actions.sendMessage", "true"]));
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "channels.telegram.actions.deleteMessage", "true"]));
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "channels.telegram.actions.sticker", "true"]));
+        extra += `[telegram-permissions] set exec host=gateway, sandbox=off, telegram actions=enabled\n`;
+      }
+
+      if (preset === "standard") {
+        // Auto-approve safe commands; ask for dangerous ones.
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "tools.exec.ask", "on-miss"]));
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "tools.exec.security", "allowlist"]));
+        extra += `[telegram-permissions] set exec ask=on-miss, security=allowlist\n`;
+      }
+
+      if (preset === "full") {
+        // Auto-approve everything, full security tier, elevated mode.
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "tools.exec.ask", "off"]));
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "tools.exec.security", "full"]));
+        await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "tools.elevated", JSON.stringify({ enabled: true })]));
+        extra += `[telegram-permissions] set exec ask=off, security=full, elevated=enabled\n`;
       }
     }
 
