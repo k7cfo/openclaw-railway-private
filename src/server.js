@@ -1112,7 +1112,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
 
         // Best-effort: enable the telegram plugin explicitly (some builds require this even when configured).
-        const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, "telegram"]));
+        const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
 
         extra += `\n[telegram config] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
         extra += `\n[telegram verify] exit=${get.code} (output ${get.output.length} chars)\n${get.output || "(no output)"}`;
@@ -1501,7 +1501,7 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]));
       out += `[telegram config] exit=${set.code}\n${set.output || "(no output)"}\n`;
 
-      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, "telegram"]));
+      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
       out += `[telegram plugin] exit=${plug.code}\n${plug.output || "(no output)"}\n`;
 
       await restartGateway();
@@ -1521,7 +1521,7 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]));
       out += `[discord config] exit=${set.code}\n${set.output || "(no output)"}\n`;
 
-      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, "discord"]));
+      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "discord"]));
       out += `[discord plugin] exit=${plug.code}\n${plug.output || "(no output)"}\n`;
 
       await restartGateway();
@@ -1533,14 +1533,14 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
 
     // Plugin management commands
     if (cmd === "openclaw.plugins.list") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "list", "--token", OPENCLAW_GATEWAY_TOKEN]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "list"]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.plugins.enable") {
       const name = String(arg || "").trim();
       if (!name) return res.status(400).json({ ok: false, error: "Missing plugin name" });
       if (!/^[A-Za-z0-9_-]+$/.test(name)) return res.status(400).json({ ok: false, error: "Invalid plugin name" });
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, name]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", name]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
 
