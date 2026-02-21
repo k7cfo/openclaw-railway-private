@@ -143,16 +143,52 @@ deploy() {
     public_url="https://<your-domain>.up.railway.app"
   fi
 
+  # ── Wait for build to finish ──────────────────────────────────────────────
   echo ""
-  info "Done! Next steps:"
+  info "Waiting for build to complete (checking every 2.5 minutes)..."
+  echo "  Press Ctrl+C to stop waiting — the build will continue on Railway."
   echo ""
-  echo "  1. Wait for the build to finish (~3-5 min)"
-  echo "  2. Visit ${public_url}/setup"
-  echo "  3. Log in: username 'admin', password = your SETUP_PASSWORD"
-  echo "  4. Select OpenRouter as provider, paste your API key"
-  echo "  5. Paste your Brave Search API key"
-  echo "  6. Optionally add Telegram/Discord bot token"
-  echo "  7. Click Run setup"
+
+  local max_checks=8   # 8 × 2.5 min = 20 min max
+  local interval=150   # 2.5 minutes in seconds
+  local check=0
+  local build_done=false
+
+  while [[ $check -lt $max_checks ]]; do
+    check=$((check + 1))
+    local http_code
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${public_url}/setup" 2>/dev/null || echo "000")
+
+    if [[ "$http_code" == "200" || "$http_code" == "401" ]]; then
+      build_done=true
+      break
+    fi
+
+    local remaining=$(( (max_checks - check) * interval / 60 ))
+    printf "  ⏳ Check %d/%d — not ready yet (HTTP %s). Next check in 2.5 min (~%d min remaining)...\n" \
+      "$check" "$max_checks" "$http_code" "$remaining"
+
+    sleep "$interval"
+  done
+
+  echo ""
+  if $build_done; then
+    info "🎉 Build complete! Service is live."
+  else
+    warn "Build didn't complete within 20 minutes. It may still be running."
+    echo "  Check status at: https://railway.com"
+  fi
+
+  # ── Next steps ────────────────────────────────────────────────────────────
+  echo ""
+  info "Next steps:"
+  echo ""
+  echo "  1. Visit ${public_url}/setup"
+  echo "  2. Log in: username 'admin', password = your SETUP_PASSWORD"
+  echo "  3. Select OpenRouter as provider, paste your API key"
+  echo "  4. Paste your Brave Search API key"
+  echo "  5. Optionally add Telegram/Discord bot token"
+  echo "  6. Click Run setup"
   echo ""
   echo "  After setup, your authenticated dashboard link will be:"
   echo ""

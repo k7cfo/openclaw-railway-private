@@ -280,28 +280,45 @@
 
   if (importRunEl) importRunEl.onclick = runImport;
 
-  // Pairing approve helper
+  // Pairing approve (form-based — uses channel selector + code input in step 5)
   var pairingBtn = document.getElementById('pairingApprove');
+  var pairingRefreshBtn = document.getElementById('pairingRefresh');
+  var pairingOutEl = document.getElementById('pairingOut');
+
   if (pairingBtn) {
     pairingBtn.onclick = function () {
-      var channel = prompt('Enter channel (telegram or discord):');
-      if (!channel) return;
-      channel = channel.trim().toLowerCase();
-      if (channel !== 'telegram' && channel !== 'discord') {
-        alert('Channel must be "telegram" or "discord"');
+      var channelEl = document.getElementById('pairingChannel');
+      var codeEl = document.getElementById('pairingCode');
+      var channel = channelEl ? channelEl.value : 'telegram';
+      var code = codeEl ? codeEl.value.trim() : '';
+      if (!code) {
+        alert('Enter a pairing code first.');
         return;
       }
-      var code = prompt('Enter pairing code (e.g. 3EY4PUYS):');
-      if (!code) return;
-      logEl.textContent += '\nApproving pairing for ' + channel + '...\n';
-      fetch('/setup/api/pairing/approve', {
+      if (pairingOutEl) pairingOutEl.textContent = 'Approving pairing for ' + channel + '...\n';
+      httpJson('/setup/api/pairing/approve', {
         method: 'POST',
-        credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ channel: channel, code: code.trim() })
-      }).then(function (r) { return r.text(); })
-        .then(function (t) { logEl.textContent += t + '\n'; })
-        .catch(function (e) { logEl.textContent += 'Error: ' + String(e) + '\n'; });
+        body: JSON.stringify({ channel: channel, code: code })
+      }).then(function (j) {
+        if (pairingOutEl) pairingOutEl.textContent = (j.output || JSON.stringify(j, null, 2)) + '\n';
+        if (j.ok && codeEl) codeEl.value = '';
+      }).catch(function (e) {
+        if (pairingOutEl) pairingOutEl.textContent = 'Error: ' + String(e) + '\n';
+      });
+    };
+  }
+
+  if (pairingRefreshBtn) {
+    pairingRefreshBtn.onclick = function () {
+      var channelEl = document.getElementById('pairingChannel');
+      var channel = channelEl ? channelEl.value : 'telegram';
+      if (pairingOutEl) pairingOutEl.textContent = 'Checking pending pairing codes for ' + channel + '...\n';
+      httpJson('/setup/api/pairing/list/' + encodeURIComponent(channel)).then(function (j) {
+        if (pairingOutEl) pairingOutEl.textContent = (j.output || 'No pending codes found.') + '\n';
+      }).catch(function (e) {
+        if (pairingOutEl) pairingOutEl.textContent = 'Error: ' + String(e) + '\n';
+      });
     };
   }
 

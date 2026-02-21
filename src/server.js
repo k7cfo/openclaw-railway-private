@@ -555,7 +555,6 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
   <div class="card">
     <h2>4) Run onboarding</h2>
     <button id="run">Run setup</button>
-    <button id="pairingApprove" style="background:#1f2937; margin-left:0.5rem">Approve pairing</button>
     <button id="reset" style="background:#444; margin-left:0.5rem">Reset setup</button>
     <pre id="log" style="white-space:pre-wrap"></pre>
     <div id="dashboardLinkBox" style="display:none; margin-top:1rem; padding:1rem; background:#0d1117; border:2px solid #22c55e; border-radius:8px">
@@ -568,7 +567,7 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
       </div>
       <p style="margin:0.75rem 0 0 0; color:#f0883e; font-size:0.85rem">⚠️ <strong>Bookmark this link and keep it private.</strong> It contains your auth token — anyone with this link has full access to your OpenClaw dashboard. Do not share it.</p>
     </div>
-    <p class="muted">Reset deletes the OpenClaw config file so you can rerun onboarding. Pairing approval lets you grant DM access when dmPolicy=pairing.</p>
+    <p class="muted">Reset deletes the OpenClaw config file so you can rerun onboarding.</p>
 
     <details style="margin-top: 0.75rem">
       <summary><strong>Pairing helper</strong> (for “disconnected (1008): pairing required”)</summary>
@@ -576,6 +575,21 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
       <button id="devicesRefresh" style="background:#0f172a">Refresh pending devices</button>
       <div id="devicesList" class="muted" style="margin-top:0.5rem"></div>
     </details>
+  </div>
+
+  <div class="card">
+    <h2>5) Approve pairing</h2>
+    <p class="muted">After setup, message your bot (e.g. <code>/start</code> in Telegram). You'll get a pairing code — enter it here to grant access.</p>
+    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+      <select id="pairingChannel" style="flex: 0 0 auto; width: auto">
+        <option value="telegram">Telegram</option>
+        <option value="discord">Discord</option>
+      </select>
+      <input id="pairingCode" placeholder="Pairing code (e.g. 3EY4PUYS)" style="flex: 1; min-width: 200px" />
+      <button id="pairingApprove" style="background:#1f2937">Approve</button>
+      <button id="pairingRefresh" style="background:#0f172a">Check pending</button>
+    </div>
+    <pre id="pairingOut" style="white-space:pre-wrap"></pre>
   </div>
 
   <script src="/setup/app.js"></script>
@@ -807,6 +821,10 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.host", INTERNAL_GATEWAY_HOST]));
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.port", String(INTERNAL_GATEWAY_PORT)]));
+    // Flat gateway.token is read by some CLI subcommands for client-side auth.
+    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.token", OPENCLAW_GATEWAY_TOKEN]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
 
@@ -1262,13 +1280,66 @@ app.post("/setup/api/config/raw", requireSetupAuth, async (req, res) => {
   }
 });
 
+// Channel pairing: list pending codes and approve them.
+// The gateway requires auth. We try the CLI with --token first, then fall back
+// to a direct HTTP request to the gateway as a last resort.
+app.get("/setup/api/pairing/list/:channel", requireSetupAuth, async (req, res) => {
+  const channel = String(req.params.channel || "").toLowerCase();
+  if (!["telegram", "discord", "whatsapp", "slack", "signal"].includes(channel)) {
+    return res.status(400).json({ ok: false, error: "Invalid channel" });
+  }
+  try { await ensureGatewayRunning(); } catch {}
+
+  // Try with --token flag (gateway requires auth).
+  const r1 = await runCmd(OPENCLAW_NODE, clawArgs(["pairing", "list", "--token", OPENCLAW_GATEWAY_TOKEN, channel]), { timeoutMs: 15_000 });
+  if (r1.code === 0) return res.json({ ok: true, output: r1.output });
+
+  // Fallback: try without --token (in case --token is unknown and config has the token).
+  const r2 = await runCmd(OPENCLAW_NODE, clawArgs(["pairing", "list", channel]), { timeoutMs: 15_000 });
+  return res.status(r2.code === 0 ? 200 : 500).json({ ok: r2.code === 0, output: r2.output || r1.output });
+});
+
 app.post("/setup/api/pairing/approve", requireSetupAuth, async (req, res) => {
   const { channel, code } = req.body || {};
   if (!channel || !code) {
     return res.status(400).json({ ok: false, error: "Missing channel or code" });
   }
-  const r = await runCmd(OPENCLAW_NODE, clawArgs(["pairing", "approve", String(channel), String(code)]));
-  return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: r.output });
+  const ch = String(channel).toLowerCase();
+  const c = String(code).trim().toUpperCase();
+
+  try { await ensureGatewayRunning(); } catch {}
+
+  // Approach 1: CLI with --token flag (most reliable for gateway-authenticated commands).
+  const r1 = await runCmd(OPENCLAW_NODE, clawArgs(["pairing", "approve", "--token", OPENCLAW_GATEWAY_TOKEN, ch, c]), { timeoutMs: 15_000 });
+  if (r1.code === 0) return res.json({ ok: true, output: r1.output });
+
+  // Approach 2: CLI without --token (relies on config gateway.remote.token / gateway.token).
+  const r2 = await runCmd(OPENCLAW_NODE, clawArgs(["pairing", "approve", ch, c]), { timeoutMs: 15_000 });
+  if (r2.code === 0) return res.json({ ok: true, output: r2.output });
+
+  // Approach 3: Direct HTTP to gateway API as last resort.
+  for (const apiPath of ["/api/pairing/approve", "/api/admin/pairing/approve"]) {
+    try {
+      const apiRes = await fetch(`${GATEWAY_TARGET}${apiPath}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENCLAW_GATEWAY_TOKEN}`,
+        },
+        body: JSON.stringify({ channel: ch, code: c }),
+      });
+      if (apiRes.ok) {
+        const text = await apiRes.text();
+        return res.json({ ok: true, output: text || "Pairing approved via gateway API." });
+      }
+    } catch {}
+  }
+
+  // All approaches failed. Return the most informative error.
+  return res.status(500).json({
+    ok: false,
+    output: [r1.output, r2.output].filter(Boolean).join("\n") || "Pairing approval failed. Check gateway logs.",
+  });
 });
 
 // Device pairing helper (list + approve) to avoid needing SSH.
@@ -1591,6 +1662,17 @@ const server = app.listen(PORT, BIND_HOST, async () => {
     try {
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.controlUi.allowInsecureAuth", "true"]));
       console.log("[wrapper] ensured gateway.controlUi.allowInsecureAuth=true");
+    } catch {}
+  }
+
+  // Ensure gateway remote config is set so CLI subcommands (pairing, devices) can auth with the gateway.
+  if (isConfigured()) {
+    try {
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.host", INTERNAL_GATEWAY_HOST]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.port", String(INTERNAL_GATEWAY_PORT)]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.token", OPENCLAW_GATEWAY_TOKEN]));
+      console.log("[wrapper] ensured gateway remote connection config");
     } catch {}
   }
 
