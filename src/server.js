@@ -405,7 +405,7 @@ async function runDoctorBestEffort() {
   lastDoctorAt = now;
 
   try {
-    const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--token", OPENCLAW_GATEWAY_TOKEN]));
+    const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--non-interactive"]));
     const out = redactSecrets(r.output || "");
     lastDoctorOutput = out.length > 50_000 ? out.slice(0, 50_000) + "\n... (truncated)\n" : out;
   } catch (err) {
@@ -1252,20 +1252,27 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     })]));
 
     // Hybrid memory search: BM25 + vectors with MMR dedup and temporal decay.
-    await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.memorySearch", JSON.stringify({
-      sources: ["memory", "sessions"],
-      query: {
-        hybrid: {
-          enabled: true,
-          vectorWeight: 0.7,
-          textWeight: 0.3,
-          mmr: { enabled: true, lambda: 0.7 },
-          temporalDecay: { enabled: true, halfLifeDays: 30 },
+    // Only enable if an embedding provider is available (OPENAI_API_KEY or GEMINI_API_KEY).
+    // Without one, the doctor warns "no embedding provider" and semantic recall silently fails.
+    const hasEmbeddingProvider = Boolean(process.env.OPENAI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim());
+    if (hasEmbeddingProvider) {
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "agents.defaults.memorySearch", JSON.stringify({
+        sources: ["memory", "sessions"],
+        query: {
+          hybrid: {
+            enabled: true,
+            vectorWeight: 0.7,
+            textWeight: 0.3,
+            mmr: { enabled: true, lambda: 0.7 },
+            temporalDecay: { enabled: true, halfLifeDays: 30 },
+          },
         },
-      },
-    })]));
-
-    extra += `\n[memory] compaction safeguard + memoryFlush enabled, contextPruning 2h, hybrid search on\n`;
+      })]));
+      extra += `\n[memory] compaction safeguard + memoryFlush enabled, contextPruning 2h, hybrid search on\n`;
+    } else {
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "agents.defaults.memorySearch.enabled", "false"]));
+      extra += `\n[memory] compaction safeguard + memoryFlush enabled, contextPruning 2h, memorySearch disabled (no OPENAI_API_KEY or GEMINI_API_KEY for embeddings)\n`;
+    }
 
     // Persist Brave Search API key (if provided) so the gateway can use web search.
     if (payload.braveApiKey?.trim()) {
@@ -1295,7 +1302,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
   return respondJson(ok ? 200 : 500, {
     ok,
-    output: `${prefix}${onboard.output}${extra}`,
+    output: redactSecrets(`${prefix}${onboard.output}${extra}`),
     dashboardUrl: ok ? dashboardUrl : null,
   });
   } catch (err) {

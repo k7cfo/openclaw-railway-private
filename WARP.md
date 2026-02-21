@@ -22,6 +22,9 @@ Railclaw: a simplified fork of `vignesh07/clawdbot-railway-template` that deploy
 - `src/server.js`: OpenRouter model catalog verified against live API — uses correct IDs with dots (e.g. `claude-sonnet-4.5` not `claude-sonnet-4-5`), correct provider prefixes (`z-ai/` not `zai/`), and only models that exist on OpenRouter
 - `src/server.js`: Removed unsupported `--token` flag from OpenClaw CLI commands that don't accept it (`plugins`, `doctor`, `status`, `health`). Kept for commands that do (`devices`, `pairing`, `logs`). Verified against OpenClaw source.
 - `src/server.js`: Stronger Telegram bot token validation (`\d{5,}:[A-Za-z0-9_-]{10,}`) to prevent truncated tokens from causing 401 retry loops
+- `src/server.js`: Setup output (`/setup/api/run`) now passed through `redactSecrets()` to prevent bot tokens and API keys from leaking in the browser response
+- `src/server.js`: `runDoctorBestEffort()` no longer passes `--token` (doctor is a local-only command)
+- `src/server.js`: Hybrid memory search is only enabled when an embedding provider is available (`OPENAI_API_KEY` or `GEMINI_API_KEY`); otherwise explicitly disabled to avoid silent failures
 
 ## OpenClaw version resolution
 The Dockerfile resolves the OpenClaw version in priority order:
