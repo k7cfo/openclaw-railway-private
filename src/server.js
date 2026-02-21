@@ -252,7 +252,7 @@ async function runDoctorBestEffort() {
   lastDoctorAt = now;
 
   try {
-    const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor"]));
+    const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--token", OPENCLAW_GATEWAY_TOKEN]));
     const out = redactSecrets(r.output || "");
     lastDoctorOutput = out.length > 50_000 ? out.slice(0, 50_000) + "\n... (truncated)\n" : out;
   } catch (err) {
@@ -902,7 +902,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         const get = await runCmd(OPENCLAW_NODE, clawArgs(["config", "get", "channels.telegram"]));
 
         // Best-effort: enable the telegram plugin explicitly (some builds require this even when configured).
-        const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
+        const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, "telegram"]));
 
         extra += `\n[telegram config] exit=${set.code} (output ${set.output.length} chars)\n${set.output || "(no output)"}`;
         extra += `\n[telegram verify] exit=${get.code} (output ${get.output.length} chars)\n${get.output || "(no output)"}`;
@@ -964,7 +964,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     // Ensure OpenClaw applies any "configured but not enabled" channel/plugin changes.
     // This makes Telegram/Discord pairing issues much less "silent".
-    const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
+    const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix", "--token", OPENCLAW_GATEWAY_TOKEN]));
     extra += `\n[doctor --fix] exit=${fix.code} (output ${fix.output.length} chars)\n${fix.output || "(no output)"}`;
 
     // Doctor may require a restart depending on changes.
@@ -1129,20 +1129,20 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.status") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["status"]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["status", "--token", OPENCLAW_GATEWAY_TOKEN]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.health") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["health"]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["health", "--token", OPENCLAW_GATEWAY_TOKEN]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.doctor") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor"]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--token", OPENCLAW_GATEWAY_TOKEN]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.logs.tail") {
       const lines = Math.max(50, Math.min(1000, Number.parseInt(arg || "200", 10) || 200));
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["logs", "--tail", String(lines)]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["logs", "--tail", String(lines), "--token", OPENCLAW_GATEWAY_TOKEN]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.config.get") {
@@ -1163,7 +1163,7 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
 
     // Device management commands (for fixing "disconnected (1008): pairing required")
     if (cmd === "openclaw.devices.list") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "list"]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "list", "--token", OPENCLAW_GATEWAY_TOKEN]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.devices.approve") {
@@ -1174,7 +1174,7 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       if (!/^[A-Za-z0-9_-]+$/.test(requestId)) {
         return res.status(400).json({ ok: false, error: "Invalid device request ID" });
       }
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "approve", requestId]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "approve", "--token", OPENCLAW_GATEWAY_TOKEN, requestId]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
 
@@ -1191,7 +1191,7 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.telegram", JSON.stringify(cfgObj)]));
       out += `[telegram config] exit=${set.code}\n${set.output || "(no output)"}\n`;
 
-      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "telegram"]));
+      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, "telegram"]));
       out += `[telegram plugin] exit=${plug.code}\n${plug.output || "(no output)"}\n`;
 
       await restartGateway();
@@ -1211,7 +1211,7 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       const set = await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "--json", "channels.discord", JSON.stringify(cfgObj)]));
       out += `[discord config] exit=${set.code}\n${set.output || "(no output)"}\n`;
 
-      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "discord"]));
+      const plug = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, "discord"]));
       out += `[discord plugin] exit=${plug.code}\n${plug.output || "(no output)"}\n`;
 
       await restartGateway();
@@ -1223,14 +1223,14 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
 
     // Plugin management commands
     if (cmd === "openclaw.plugins.list") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "list"]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "list", "--token", OPENCLAW_GATEWAY_TOKEN]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.plugins.enable") {
       const name = String(arg || "").trim();
       if (!name) return res.status(400).json({ ok: false, error: "Missing plugin name" });
       if (!/^[A-Za-z0-9_-]+$/.test(name)) return res.status(400).json({ ok: false, error: "Invalid plugin name" });
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", name]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["plugins", "enable", "--token", OPENCLAW_GATEWAY_TOKEN, name]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
 
@@ -1344,7 +1344,7 @@ app.post("/setup/api/pairing/approve", requireSetupAuth, async (req, res) => {
 
 // Device pairing helper (list + approve) to avoid needing SSH.
 app.get("/setup/api/devices/pending", requireSetupAuth, async (_req, res) => {
-  const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "list"]));
+  const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "list", "--token", OPENCLAW_GATEWAY_TOKEN]));
   const output = redactSecrets(r.output);
   const requestIds = extractDeviceRequestIds(output);
   return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, requestIds, output });
@@ -1354,7 +1354,7 @@ app.post("/setup/api/devices/approve", requireSetupAuth, async (req, res) => {
   const requestId = String((req.body && req.body.requestId) || "").trim();
   if (!requestId) return res.status(400).json({ ok: false, error: "Missing device request ID" });
   if (!/^[A-Za-z0-9_-]+$/.test(requestId)) return res.status(400).json({ ok: false, error: "Invalid device request ID" });
-  const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "approve", requestId]));
+  const r = await runCmd(OPENCLAW_NODE, clawArgs(["devices", "approve", "--token", OPENCLAW_GATEWAY_TOKEN, requestId]));
   return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
 });
 
@@ -1605,6 +1605,14 @@ const server = app.listen(PORT, BIND_HOST, async () => {
     fs.chmodSync(STATE_DIR, 0o700);
   } catch {}
 
+  // Always persist gateway token to disk so CLI tools that read the file can authenticate.
+  // resolveGatewayToken() only writes the file when auto-generating; if the token comes
+  // from an env var (e.g. Railway Variables), no file is created, breaking CLI auth.
+  try {
+    const tokenPath = path.join(STATE_DIR, "gateway.token");
+    fs.writeFileSync(tokenPath, OPENCLAW_GATEWAY_TOKEN, { encoding: "utf8", mode: 0o600 });
+  } catch {}
+
   console.log(`[wrapper] gateway token: ${OPENCLAW_GATEWAY_TOKEN ? "(set)" : "(missing)"}`);
   console.log(`[wrapper] gateway target: ${GATEWAY_TARGET}`);
   if (!SETUP_PASSWORD) {
@@ -1672,6 +1680,10 @@ const server = app.listen(PORT, BIND_HOST, async () => {
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.port", String(INTERNAL_GATEWAY_PORT)]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.token", OPENCLAW_GATEWAY_TOKEN]));
+      // Ensure the gateway auth mode and token are set in config so CLI tools
+      // can authenticate even without the --token flag (belt-and-suspenders).
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
+      await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
       console.log("[wrapper] ensured gateway remote connection config");
     } catch {}
   }
