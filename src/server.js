@@ -555,6 +555,16 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
     <button id="pairingApprove" style="background:#1f2937; margin-left:0.5rem">Approve pairing</button>
     <button id="reset" style="background:#444; margin-left:0.5rem">Reset setup</button>
     <pre id="log" style="white-space:pre-wrap"></pre>
+    <div id="dashboardLinkBox" style="display:none; margin-top:1rem; padding:1rem; background:#0d1117; border:2px solid #22c55e; border-radius:8px">
+      <h3 style="margin:0 0 0.5rem 0; color:#22c55e">✅ Setup complete!</h3>
+      <p style="margin:0 0 0.5rem 0"><strong>Your dashboard link (with auth token):</strong></p>
+      <input id="dashboardLink" type="text" readonly style="width:100%; font-family:monospace; font-size:0.85rem; padding:0.5rem; background:#161b22; color:#58a6ff; border:1px solid #30363d; border-radius:4px; cursor:text" />
+      <div style="margin-top:0.5rem; display:flex; gap:0.5rem">
+        <button id="copyDashLink" style="background:#22c55e; color:#000">📋 Copy link</button>
+        <a id="openDashLink" href="#" target="_blank" style="display:inline-block; padding:0.4rem 0.8rem; background:#1f6feb; color:#fff; border-radius:4px; text-decoration:none">↗ Open dashboard</a>
+      </div>
+      <p style="margin:0.75rem 0 0 0; color:#f0883e; font-size:0.85rem">⚠️ <strong>Bookmark this link and keep it private.</strong> It contains your auth token — anyone with this link has full access to your OpenClaw dashboard. Do not share it.</p>
+    </div>
     <p class="muted">Reset deletes the OpenClaw config file so you can rerun onboarding. Pairing approval lets you grant DM access when dmPolicy=pairing.</p>
 
     <details style="margin-top: 0.75rem">
@@ -633,6 +643,15 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
 
 app.get("/setup/api/auth-groups", requireSetupAuth, (_req, res) => {
   res.json({ ok: true, authGroups: AUTH_GROUPS });
+});
+
+// Returns the dashboard URL with the gateway token embedded for bookmarking.
+app.get("/setup/api/dashboard-url", requireSetupAuth, (req, res) => {
+  const host = req.headers.host || "localhost";
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  const token = OPENCLAW_GATEWAY_TOKEN;
+  const url = token ? `${proto}://${host}/?token=${token}` : null;
+  res.json({ ok: true, dashboardUrl: url, hasToken: Boolean(token) });
 });
 
 function buildOnboardArgs(payload) {
@@ -931,9 +950,17 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     await restartGateway();
   }
 
+  // Build the dashboard URL so the client can display it after setup.
+  const dashHost = req.headers.host || "localhost";
+  const dashProto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  const dashboardUrl = OPENCLAW_GATEWAY_TOKEN
+    ? `${dashProto}://${dashHost}/?token=${OPENCLAW_GATEWAY_TOKEN}`
+    : null;
+
   return respondJson(ok ? 200 : 500, {
     ok,
     output: `${prefix}${onboard.output}${extra}`,
+    dashboardUrl: ok ? dashboardUrl : null,
   });
   } catch (err) {
     console.error("[/setup/api/run] error:", err);

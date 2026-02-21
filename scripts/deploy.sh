@@ -118,8 +118,11 @@ deploy() {
   fi
   info "Volume attached."
 
-  info "Deploying..."
-  if ! railway up --detach 2>&1; then
+  info "Deploying from project root..."
+  # railway up uploads the current directory — must be the project root (where Dockerfile lives).
+  local project_root
+  project_root="$(cd "$(dirname "$0")/.." && pwd)"
+  if ! (cd "$project_root" && railway up --detach) 2>&1; then
     fail "Deploy failed. Check Railway logs."
   fi
   info "Deployment triggered. Build takes ~3-5 minutes."
@@ -150,6 +153,13 @@ deploy() {
   echo "  5. Paste your Brave Search API key"
   echo "  6. Optionally add Telegram/Discord bot token"
   echo "  7. Click Run setup"
+  echo ""
+  echo "  After setup, your authenticated dashboard link will be:"
+  echo ""
+  echo "    ${public_url}/?token=${gw_token}"
+  echo ""
+  echo "  ⚠️  Bookmark this link and keep it private!"
+  echo "  It contains your auth token — anyone with this link has full access."
   echo ""
 }
 
