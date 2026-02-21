@@ -1274,7 +1274,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     // Ensure OpenClaw applies any "configured but not enabled" channel/plugin changes.
     // This makes Telegram/Discord pairing issues much less "silent".
-    const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix", "--token", OPENCLAW_GATEWAY_TOKEN]));
+    const fix = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix", "--non-interactive"]));
     extra += `\n[doctor --fix] exit=${fix.code} (output ${fix.output.length} chars)\n${fix.output || "(no output)"}`;
 
     // Doctor may require a restart depending on changes.
@@ -1439,15 +1439,15 @@ app.post("/setup/api/console/run", requireSetupAuth, async (req, res) => {
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.status") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["status", "--token", OPENCLAW_GATEWAY_TOKEN]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["status"]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.health") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["health", "--token", OPENCLAW_GATEWAY_TOKEN]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["health"]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.doctor") {
-      const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--token", OPENCLAW_GATEWAY_TOKEN]));
+      const r = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--non-interactive"]));
       return res.status(r.code === 0 ? 200 : 500).json({ ok: r.code === 0, output: redactSecrets(r.output) });
     }
     if (cmd === "openclaw.logs.tail") {
