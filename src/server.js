@@ -315,7 +315,7 @@ async function cleanupOrphanedGateway() {
           encoding: "utf8",
           timeout: 2000,
         });
-        const pid = lsofResult.stdout.trim();
+        const pid = (lsofResult.stdout || "").trim();
         if (pid && /^\d+$/.test(pid)) {
           console.warn(`[wrapper] Killing orphaned process on port ${INTERNAL_GATEWAY_PORT} (PID ${pid})`);
           childProcess.spawnSync("kill", ["-9", pid]);
@@ -1037,11 +1037,12 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
     await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
 
-    // Railway runs behind a reverse proxy. Trust loopback as a proxy hop so local client detection
-    // remains correct when X-Forwarded-* headers are present.
+    // Railway runs behind a reverse proxy. The wrapper proxies from loopback to the gateway,
+    // forwarding X-Forwarded-* headers from Railway's edge. Trust all addresses since the
+    // gateway only listens on loopback (--gateway-bind loopback) and is not externally reachable.
     await runCmd(
       OPENCLAW_NODE,
-      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["*********"]) ]),
+      clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["0.0.0.0/0", "::/0"]) ]),
     );
 
     // Allow Control UI over plain HTTP (Cloudflare Tunnel or internal access).
