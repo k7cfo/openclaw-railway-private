@@ -1,137 +1,47 @@
-# Agent Instructions — OpenClaw Deploy
+# Agent Instructions — OpenClaw on Railway
 
-This file instructs AI coding agents (Warp/Oz, Claude Code, Anti-Gravity, Cursor, etc.)
-how to deploy OpenClaw on Railway with Cloudflare Tunnel.
+This file instructs AI coding agents (Warp/Oz, Claude Code, Cursor, etc.)
+how to work with this repository.
 
-## What this does
+## What this is
 
-Deploys an OpenClaw AI assistant on Railway, securely exposed via a Cloudflare
-Tunnel on a custom domain (e.g. `openclaw.example.com`). Cloudflare handles
-TLS termination — no public ports or firewall holes needed.
+A deploy template for OpenClaw on Railway. No tunnels, no sidecars — Railway provides HTTPS.
 
-## Required credentials
-
-Before starting, the user MUST provide these as environment variables.
-**Do not hardcode or echo secrets. Store them as env vars only.**
-
-- `CLOUDFLARE_API_TOKEN` — [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens) → Create Token. Needs: Cloudflare Tunnel:Edit, DNS:Edit, Account Settings:Read.
-- `CLOUDFLARE_ACCOUNT_ID` — [Cloudflare Dashboard](https://dash.cloudflare.com) → right sidebar on account home.
-- `CLOUDFLARE_HOSTNAME` — Public hostname (e.g. `openclaw.example.com`). Must be on a Cloudflare-managed domain.
-- `RAILWAY_TOKEN` — [Railway Account > Tokens](https://railway.com/account/tokens) → Create Token. Optional if `railway login` already done.
-- `SETUP_PASSWORD` — Password to protect the `/setup` wizard. Any string.
-
-Optional:
-- `PROJECT_NAME` — Railway project name (default: `openclaw`)
-- `CLOUDFLARE_ZONE_ID` — Auto-detected from hostname if omitted.
-- `OPENCLAW_GATEWAY_TOKEN` — Gateway admin token (auto-generated if not set)
-
-## Prerequisites (install if missing)
-
-- **Railway CLI** — `brew install railway`
-- **jq** — `brew install jq`
-
-## Quick start
+## Deploy
 
 ```bash
-cp .env.sample .env
-# Edit .env with your values (see "Required credentials" above)
-bash scripts/setup-cloudflare.sh
+bash scripts/setup.sh     # first time (installs prereqs, logs in, deploys)
+bash scripts/deploy.sh     # subsequent deploys
 ```
 
-The script auto-sources `.env`, so no need to export manually.
-It automates: creating the Cloudflare Tunnel, configuring DNS, deploying
-OpenClaw to Railway, and outputting the tunnel token for the cloudflared sidecar.
-The cloudflared sidecar deployment requires one manual action in the Railway dashboard.
+## Architecture
 
-IMPORTANT: `.env` is in `.gitignore` — it will never be committed.
+- Wrapper server (`src/server.js`) listens on port 8080, proxies to OpenClaw gateway on localhost:18789
+- Railway provides HTTPS via `.up.railway.app` domain
+- Volume at `/data` persists config, workspace, and API keys across redeploys
+- Everything outside `/data` is wiped on redeploy
 
-## Manual step-by-step (if the script fails or agent prefers API calls)
+## Workspace bootstrap
 
-### Step 1: Create Cloudflare Tunnel
+OpenClaw's gateway creates workspace files (`AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, etc.) automatically on the user's first message. The wrapper does NOT pre-seed these files — doing so would prevent the first-run onboarding conversation.
 
-```bash
-# Generate tunnel secret
-TUNNEL_SECRET=$(openssl rand -base64 32)
+The wrapper pre-seeds only `BOOTSTRAP.md` (from `templates/workspace/BOOTSTRAP.md`) with a Railway-specific version that prioritizes naming the bot and learning who the user is.
 
-# Create tunnel
-curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/cfd_tunnel" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\": \"openclaw\", \"tunnel_secret\": \"$TUNNEL_SECRET\", \"config_src\": \"cloudflare\"}"
-```
+Railway persistence rules (`templates/RAILWAY-PERSISTENCE.md`) are appended to the workspace `AGENTS.md` after OpenClaw creates it.
 
-Save `result.id` as `TUNNEL_ID`.
+## Key files
 
-### Step 2: Configure tunnel ingress
+- `src/server.js` — wrapper server (proxy, setup wizard, lifecycle management)
+- `src/setup-app.js` — setup wizard client-side JS
+- `scripts/deploy.sh` — Railway deploy script
+- `scripts/setup.sh` — full interactive setup (installs prereqs + deploys)
+- `templates/RAILWAY-PERSISTENCE.md` — Railway-specific rules appended to workspace AGENTS.md
+- `templates/workspace/BOOTSTRAP.md` — custom first-run onboarding script
+- `Dockerfile` — builds OpenClaw from source + runtime image
 
-```bash
-curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/cfd_tunnel/$TUNNEL_ID/configurations" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"config": {"ingress": [{"hostname": "'"$CLOUDFLARE_HOSTNAME"'", "service": "http://openclaw.railway.internal:8080"}, {"service": "http_status:404"}]}}'
-```
+## Security
 
-### Step 3: Create DNS CNAME
-
-```bash
-curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/dns_records" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"type": "CNAME", "name": "'"$CLOUDFLARE_HOSTNAME"'", "content": "'"$TUNNEL_ID"'.cfargotunnel.com", "proxied": true}'
-```
-
-### Step 4: Get tunnel token
-
-```bash
-curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/cfd_tunnel/$TUNNEL_ID/token" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
-```
-
-Save `result` as `TUNNEL_TOKEN`.
-
-### Step 5: Deploy OpenClaw to Railway
-
-```bash
-export RAILWAY_TOKEN
-railway init --name "${PROJECT_NAME:-openclaw}"
-railway variable set \
-  SETUP_PASSWORD="$SETUP_PASSWORD" \
-  OPENCLAW_STATE_DIR="/data/.openclaw" \
-  OPENCLAW_WORKSPACE_DIR="/data/workspace" \
-  PORT="8080"
-railway up --detach
-```
-
-Important: The service source must be `k7cfo/openclaw-railway-private` (this fork),
-NOT the upstream `vignesh07/clawdbot-railway-template`. The upstream binds to
-`*******` (IPv4 only) which breaks Railway private networking (IPv6).
-
-### Step 6: Deploy cloudflared sidecar
-
-In the Railway dashboard:
-1. Open the project
-2. Click **Create → New Service → Docker Image**
-3. Use image: `cloudflare/cloudflared:latest`
-4. Set start command: `tunnel --no-autoupdate run`
-5. Add variable: `TUNNEL_TOKEN=<token-from-step-4>`
-
-### Step 7: Verify
-
-```bash
-curl https://$CLOUDFLARE_HOSTNAME/setup
-```
-
-## Key technical details
-
-- This fork binds the wrapper to `::` (dual-stack) instead of `*******`
-- Railway private networking uses IPv6 (`fd12::/16` range)
-- The wrapper listens on port 8080, proxying to the gateway on `*********:18789`
-- Cloudflare terminates TLS and proxies to the cloudflared sidecar, which connects to OpenClaw via Railway internal network
-- Optional: Cloudflare Access policies for zero-trust authentication
-
-## Troubleshooting
-
-- **Tunnel not connected**: Check that the cloudflared sidecar is running in Railway and has the correct `TUNNEL_TOKEN`
-- **DNS not resolving**: Verify the CNAME record exists in Cloudflare DNS for your hostname
-- **502 Bad Gateway**: OpenClaw service may still be building (takes 3-5 min), or port mismatch
-- **Connection refused on IPv6**: Service isn't using this fork (binding to `*******`)
+- `.env` is gitignored — never commit it
+- API keys go into the `/setup` wizard, not env vars
+- `SETUP_PASSWORD` protects the admin page
+- Gateway token is auto-generated and persisted to `/data`

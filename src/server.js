@@ -174,6 +174,27 @@ function tryAppendRailwayPersistence() {
   }
 }
 
+const BOOTSTRAP_TEMPLATE_PATH = path.join("/app", "templates", "workspace", "BOOTSTRAP.md");
+
+function seedCustomBootstrap() {
+  const bootstrapMdPath = path.join(WORKSPACE_DIR, "BOOTSTRAP.md");
+  try {
+    if (fs.existsSync(bootstrapMdPath)) return; // already exists (workspace not new)
+    if (!fs.existsSync(BOOTSTRAP_TEMPLATE_PATH)) {
+      console.warn("[wrapper] custom BOOTSTRAP.md template not found; OpenClaw will use its stock version");
+      return;
+    }
+    const content = fs.readFileSync(BOOTSTRAP_TEMPLATE_PATH, "utf8");
+    fs.writeFileSync(bootstrapMdPath, content, { encoding: "utf8", flag: "wx" });
+    console.log(`[wrapper] seeded custom BOOTSTRAP.md in workspace`);
+  } catch (err) {
+    // EEXIST is fine (race condition); anything else is non-fatal.
+    if (err?.code !== "EEXIST") {
+      console.warn(`[wrapper] BOOTSTRAP.md seed failed (non-fatal): ${err}`);
+    }
+  }
+}
+
 function appendRailwayPersistenceRules() {
   // Try immediately (covers existing workspaces / redeploys).
   if (tryAppendRailwayPersistence()) return;
@@ -559,22 +580,24 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
 
     <div style="display:flex; gap:0.5rem; align-items:center">
       <select id="consoleCmd" style="flex: 1">
-        <option value="channels.add.telegram">➕ Add Telegram (paste bot token in arg)</option>
-        <option value="channels.add.discord">➕ Add Discord (paste bot token in arg)</option>
-        <option disabled>──────────</option>
-        <option value="gateway.restart">gateway.restart (wrapper-managed)</option>
-        <option value="gateway.stop">gateway.stop (wrapper-managed)</option>
-        <option value="gateway.start">gateway.start (wrapper-managed)</option>
         <option value="openclaw.status">openclaw status</option>
         <option value="openclaw.health">openclaw health</option>
         <option value="openclaw.doctor">openclaw doctor</option>
+        <option value="openclaw.version">openclaw --version</option>
+        <option disabled>──────</option>
+        <option value="gateway.restart">gateway.restart (wrapper-managed)</option>
+        <option value="gateway.stop">gateway.stop (wrapper-managed)</option>
+        <option value="gateway.start">gateway.start (wrapper-managed)</option>
+        <option disabled>──────</option>
         <option value="openclaw.logs.tail">openclaw logs --tail N</option>
         <option value="openclaw.config.get">openclaw config get &lt;path&gt;</option>
-        <option value="openclaw.version">openclaw --version</option>
         <option value="openclaw.devices.list">openclaw devices list</option>
         <option value="openclaw.devices.approve">openclaw devices approve &lt;requestId&gt;</option>
         <option value="openclaw.plugins.list">openclaw plugins list</option>
         <option value="openclaw.plugins.enable">openclaw plugins enable &lt;name&gt;</option>
+        <option disabled>──────</option>
+        <option value="channels.add.telegram">➕ Add Telegram (paste bot token in arg)</option>
+        <option value="channels.add.discord">➕ Add Discord (paste bot token in arg)</option>
       </select>
       <input id="consoleArg" placeholder="Optional arg (e.g. 200, gateway.port)" style="flex: 1" />
       <button id="consoleRun" style="background:#0f172a">Run</button>
@@ -629,31 +652,7 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
   </div>
 
   <div class="card">
-    <h2>3) Optional: Chat platform</h2>
-    <p class="muted">You can also add channels later inside OpenClaw, but this helps you get messaging working immediately.</p>
-
-    <label>Telegram bot token (optional)</label>
-    <input id="telegramToken" type="password" placeholder="123456:ABC..." />
-    <div class="muted" style="margin-top: 0.25rem">
-      Get it from BotFather: open Telegram, message <code>@BotFather</code>, run <code>/newbot</code>, then copy the token.
-    </div>
-
-    <label>Discord bot token (optional)</label>
-    <input id="discordToken" type="password" placeholder="Bot token" />
-    <div class="muted" style="margin-top: 0.25rem">
-      Get it from the Discord Developer Portal: create an application, add a Bot, then copy the Bot Token.<br/>
-      <strong>Important:</strong> Enable <strong>MESSAGE CONTENT INTENT</strong> in Bot → Privileged Gateway Intents, or the bot will crash on startup.
-    </div>
-
-    <label>Slack bot token (optional)</label>
-    <input id="slackBotToken" type="password" placeholder="xoxb-..." />
-
-    <label>Slack app token (optional)</label>
-    <input id="slackAppToken" type="password" placeholder="xapp-..." />
-  </div>
-
-  <div class="card">
-    <h2>3b) Advanced: Custom OpenAI-compatible provider (optional)</h2>
+    <h2>3) Advanced: Custom OpenAI-compatible provider (optional)</h2>
     <p class="muted">Use this to configure an OpenAI-compatible API that requires a custom base URL (e.g. Ollama, vLLM, LM Studio, hosted proxies). You usually set the API key as a Railway variable and reference it here.</p>
 
     <label>Provider id (e.g. ollama, deepseek, myproxy)</label>
@@ -676,7 +675,31 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
   </div>
 
   <div class="card">
-    <h2>4) Run onboarding</h2>
+    <h2>4) Optional: Chat platform</h2>
+    <p class="muted">You can also add channels later via the debug console above. Adding them here gets messaging working immediately.</p>
+
+    <label>Telegram bot token (optional)</label>
+    <input id="telegramToken" type="password" placeholder="123456:ABC..." />
+    <div class="muted" style="margin-top: 0.25rem">
+      Get it from BotFather: open Telegram, message <code>@BotFather</code>, run <code>/newbot</code>, then copy the token.
+    </div>
+
+    <label>Discord bot token (optional)</label>
+    <input id="discordToken" type="password" placeholder="Bot token" />
+    <div class="muted" style="margin-top: 0.25rem">
+      Get it from the Discord Developer Portal: create an application, add a Bot, then copy the Bot Token.<br/>
+      <strong>Important:</strong> Enable <strong>MESSAGE CONTENT INTENT</strong> in Bot → Privileged Gateway Intents, or the bot will crash on startup.
+    </div>
+
+    <label>Slack bot token (optional)</label>
+    <input id="slackBotToken" type="password" placeholder="xoxb-..." />
+
+    <label>Slack app token (optional)</label>
+    <input id="slackAppToken" type="password" placeholder="xapp-..." />
+  </div>
+
+  <div class="card">
+    <h2>5) Run onboarding</h2>
     <button id="run">Run setup</button>
     <button id="reset" style="background:#444; margin-left:0.5rem">Reset setup</button>
     <pre id="log" style="white-space:pre-wrap"></pre>
@@ -701,7 +724,7 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
   </div>
 
   <div class="card">
-    <h2>5) Approve pairing</h2>
+    <h2>6) Approve pairing</h2>
     <p class="muted">After setup, message your bot (e.g. <code>/start</code> in Telegram). You'll get a pairing code — enter it here to grant access.</p>
     <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
       <select id="pairingChannel" style="flex: 0 0 auto; width: auto">
@@ -1742,12 +1765,16 @@ const server = app.listen(PORT, BIND_HOST, async () => {
     console.warn("[wrapper] WARNING: SETUP_PASSWORD is not set; /setup will error.");
   }
 
-  // Append Railway persistence rules to AGENTS.md once OpenClaw creates it.
-  // We intentionally do NOT pre-create workspace files — OpenClaw's own
-  // bootstrap handles that (including BOOTSTRAP.md for first-run onboarding).
-  // Pre-creating AGENTS.md would prevent BOOTSTRAP.md from being generated,
-  // breaking the "who are you? / who am I?" first-message conversation.
+  // Workspace bootstrap strategy:
+  // 1. We pre-seed ONLY BOOTSTRAP.md with our custom version (more assertive
+  //    onboarding: name the bot first, then learn who the user is).
+  //    This is safe because OpenClaw's isBrandNewWorkspace check does NOT
+  //    look at BOOTSTRAP.md — it only checks AGENTS/SOUL/TOOLS/IDENTITY/USER/HEARTBEAT.
+  // 2. We do NOT pre-create any other workspace files — OpenClaw seeds those
+  //    from its own stock templates on first message.
+  // 3. Railway persistence rules are appended to AGENTS.md after OpenClaw creates it.
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+  seedCustomBootstrap();
   appendRailwayPersistenceRules();
 
   // Optional operator hook to install/persist extra tools under /data.

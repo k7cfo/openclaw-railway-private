@@ -94,7 +94,7 @@ deploy() {
   info "Project created: $project_name"
 
   info "Adding service..."
-  warn "If Railway asks 'Enter a variable' — just press Escape to skip. We set variables in the next step."
+  printf "${RED}${BOLD}[!] If Railway asks 'Enter a variable' — just press Escape to skip. We set variables in the next step.${NC}\n"
   if ! railway add --service "$project_name" 2>&1; then
     fail "Failed to add service."
   fi
@@ -151,12 +151,12 @@ deploy() {
 
   # ── Wait for build to finish ──────────────────────────────────────────────
   echo ""
-  info "Waiting for build to complete (checking every 2.5 minutes)..."
+  info "Waiting for build to complete (checking every 15 seconds)..."
   echo "  Press Ctrl+C to stop waiting — the build will continue on Railway."
   echo ""
 
-  local max_checks=8   # 8 × 2.5 min = 20 min max
-  local interval=150   # 2.5 minutes in seconds
+  local max_checks=80  # 80 × 15s = 20 min max
+  local interval=15    # 15 seconds
   local check=0
   local build_done=false
 
@@ -170,9 +170,10 @@ deploy() {
       break
     fi
 
-    local remaining=$(( (max_checks - check) * interval / 60 ))
-    printf "  ⏳ Check %d/%d — not ready yet (HTTP %s). Next check in 2.5 min (~%d min remaining)...\n" \
-      "$check" "$max_checks" "$http_code" "$remaining"
+    local remaining_sec=$(( (max_checks - check) * interval ))
+    local remaining_min=$(( remaining_sec / 60 ))
+    printf "  ⏳ Check %d/%d — not ready yet (HTTP %s). Next check in 15s (~%d min remaining)...\n" \
+      "$check" "$max_checks" "$http_code" "$remaining_min"
 
     sleep "$interval"
   done
