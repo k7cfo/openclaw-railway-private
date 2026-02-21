@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve the OpenClaw Railway Template.
+Thanks for helping improve Railclaw.
 
 ## Where to ask questions / get help
 

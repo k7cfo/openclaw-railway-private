@@ -1,6 +1,6 @@
 # Telegram Setup & Troubleshooting
 
-Complete guide for setting up and pairing Telegram with OpenClaw on Railway.
+Complete guide for setting up and pairing Telegram with Railclaw (OpenClaw on Railway).
 
 ## Quick Start
 
@@ -240,5 +240,5 @@ If Telegram still isn't working after trying the above:
 
 ## Support
 
-- GitHub Issues: https://github.com/k7cfo/openclaw-railway-private/issues
+- GitHub Issues: https://github.com/k7cfo/railclaw/issues
 - OpenClaw Discord: https://discord.gg/openclaw (community support)

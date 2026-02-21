@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────────────────────
-# OpenClaw Deploy — Railway
+# Railclaw — Deploy OpenClaw on Railway
 # Creates a Railway project, sets variables, attaches a volume, and deploys.
 #
 # Requirements (env vars):
@@ -10,7 +10,7 @@ set -euo pipefail
 #
 # Optional:
 #   RAILWAY_TOKEN          — Railway API token (falls back to `railway login`)
-#   PROJECT_NAME           — Railway project name (default: "openclaw")
+#   PROJECT_NAME           — Railway project name (default: "railclaw")
 #   OPENCLAW_GIT_REF       — Pin a specific OpenClaw version (default: latest stable release)
 #   OPENCLAW_GATEWAY_TOKEN — Gateway admin token (auto-generated if not set)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ resolve_openclaw_version() {
 
 # ── Deploy ───────────────────────────────────────────────────────────────────
 deploy() {
-  local project_name="${PROJECT_NAME:-openclaw}"
+  local project_name="${PROJECT_NAME:-railclaw}"
 
   resolve_openclaw_version
 
@@ -209,8 +209,8 @@ deploy() {
 # ── Main ─────────────────────────────────────────────────────────────────────
 main() {
   echo "╔══════════════════════════════════════════════════════════╗"
-  echo "║  OpenClaw Deploy — Railway                              ║"
-  echo "║  github.com/k7cfo/openclaw-railway-private              ║"
+  echo "║  Railclaw — Deploy OpenClaw on Railway                  ║"
+  echo "║  github.com/k7cfo/railclaw                              ║"
   echo "╚══════════════════════════════════════════════════════════╝"
   echo ""
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────────────────────
-# OpenClaw — Full Interactive Setup
+# Railclaw — Full Interactive Setup
 #
 # This script handles everything:
 #   1. Installs Homebrew (if missing)
@@ -34,12 +34,12 @@ ask()   { printf "${CYAN}[?]${NC} %s" "$1"; }
 banner() {
   echo ""
   echo "╔══════════════════════════════════════════════════════════╗"
-  echo "║  OpenClaw — Full Interactive Setup                      ║"
-  echo "║  github.com/k7cfo/openclaw-railway-private              ║"
+  echo "║  Railclaw — Deploy OpenClaw on Railway                  ║"
+  echo "║  github.com/k7cfo/railclaw                              ║"
   echo "╚══════════════════════════════════════════════════════════╝"
   echo ""
   echo "  This will install prerequisites, configure your keys,"
-  echo "  and deploy OpenClaw to Railway."
+  echo "  and deploy Railclaw (OpenClaw on Railway)."
   echo ""
 }
 
@@ -185,9 +185,9 @@ collect_config() {
   fi
 
   # Project name
-  ask "Railway project name [openclaw]: "
+  ask "Railway project name [railclaw]: "
   read -r input_project_name
-  PROJECT_NAME="${input_project_name:-openclaw}"
+  PROJECT_NAME="${input_project_name:-railclaw}"
   info "Project name: $PROJECT_NAME"
 
   echo ""
@@ -239,7 +239,7 @@ run_deploy() {
   echo ""
   printf "${BOLD}── Deploy ──${NC}\n"
   echo ""
-  ask "Deploy OpenClaw to Railway now? [Y/n] "
+  ask "Deploy Railclaw to Railway now? [Y/n] "
   read -r yn
   case "$yn" in
     [Nn]*) 

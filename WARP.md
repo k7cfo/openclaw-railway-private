@@ -1,10 +1,10 @@
-# OpenClaw Railway — Project Context
+# Railclaw — Project Context
 
 ## What this is
-A simplified fork of `vignesh07/clawdbot-railway-template` that deploys OpenClaw on Railway using Railway's built-in HTTPS. No tunnels or sidecars needed.
+Railclaw: a simplified fork of `vignesh07/clawdbot-railway-template` that deploys OpenClaw on Railway using Railway's built-in HTTPS. No tunnels or sidecars needed.
 
 ## Repo
-- **GitHub:** https://github.com/k7cfo/openclaw-railway-private
+- **GitHub:** https://github.com/k7cfo/railclaw
 - **Upstream:** https://github.com/vignesh07/clawdbot-railway-template
 
 ## Key changes from upstream
@@ -20,8 +20,8 @@ A simplified fork of `vignesh07/clawdbot-railway-template` that deploys OpenClaw
 - Removed Tailscale and Cloudflare Tunnel (not needed — Railway provides HTTPS)
 
 ## Current deployment
-- **Railway project:** `openclaw` (workspace K7)
-- **Service:** `openclaw` (single service, no sidecar)
+- **Railway project:** `railclaw` (workspace K7)
+- **Service:** `railclaw` (single service, no sidecar)
 - **Public URL:** `https://<app>.up.railway.app` (Railway HTTPS)
 - **Volume:** `/data` (5GB) for persistent state
 
@@ -37,7 +37,7 @@ A simplified fork of `vignesh07/clawdbot-railway-template` that deploys OpenClaw
 
 ## "Deploy for friends" workflow
 - Friend gets: OpenAI API key, Brave Search API key, picks a setup password
-- Deployer runs `scripts/deploy.sh` with friend's SETUP_PASSWORD
+- Deployer runs `scripts/deploy.sh` with friend's SETUP_PASSWORD (default project name: `railclaw`)
 - Friend visits `/setup` and pastes their keys
 
 ## Credentials
@@ -45,3 +45,10 @@ A simplified fork of `vignesh07/clawdbot-railway-template` that deploys OpenClaw
 - API keys (OpenAI, Brave Search) go into the `/setup` wizard, not `.env`
 - Check 1Password for keys
 - `.env` is gitignored, never committed
+
+## Naming convention
+- **Railclaw** = this project/repo (the deploy wrapper)
+- **OpenClaw** = the upstream product being deployed (never renamed)
+- All `OPENCLAW_*` env vars reference the upstream product and are intentionally kept
+- Default Railway project name: `railclaw`
+- When used as a Railway template, projects deploy as `railclaw` (users can override via `PROJECT_NAME`)

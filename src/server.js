@@ -541,7 +541,7 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OpenClaw Setup</title>
+  <title>Railclaw Setup</title>
   <style>
     body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin: 2rem; max-width: 900px; }
     .card { border: 1px solid #ddd; border-radius: 12px; padding: 1.25rem; margin: 1rem 0; }
@@ -553,8 +553,9 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
   </style>
 </head>
 <body>
-  <h1>OpenClaw Setup</h1>
+  <h1>Railclaw Setup</h1>
   <p class="muted">This wizard configures OpenClaw by running the same onboarding command it uses in the terminal, but from the browser.</p>
+  <p><a href="#first-time-setup" style="font-weight:700; font-size:1.1rem">↓ Jump to First Time Setup</a></p>
 
   <div class="card">
     <h2>Status</h2>
@@ -616,6 +617,8 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
     </div>
     <pre id="configOut" style="white-space:pre-wrap"></pre>
   </div>
+
+  <h2 id="first-time-setup" style="font-size: 2rem; margin-top: 2.5rem; padding-top: 1rem; border-top: 3px solid #111">🚀 First Time Setup</h2>
 
   <div class="card">
     <h2>1) Model/auth provider</h2>

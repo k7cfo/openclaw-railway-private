@@ -1,11 +1,11 @@
-# Agent Instructions — OpenClaw on Railway
+# Agent Instructions — Railclaw
 
 This file instructs AI coding agents (Warp/Oz, Claude Code, Cursor, etc.)
 how to work with this repository.
 
 ## What this is
 
-A deploy template for OpenClaw on Railway. No tunnels, no sidecars — Railway provides HTTPS.
+Railclaw: a deploy template for OpenClaw on Railway. No tunnels, no sidecars — Railway provides HTTPS.
 
 ## Deploy
 

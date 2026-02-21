@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/railclaw.png" alt="OpenClaw on Railway" width="200">
+  <img src="assets/railclaw.png" alt="Railclaw — Deploy OpenClaw on Railway" width="200">
 </p>
 
-# OpenClaw on Railway — Always the Latest Stable Release
+# Railclaw — Deploy OpenClaw on Railway
 
-This is one of the few turnkey scripts that **automatically builds and deploys the latest stable release of OpenClaw** on Railway. No manual version tracking, no stale builds — run the deploy script and you get the newest release from GitHub, built from source, with HTTPS out of the box.
+One of the few turnkey scripts that **automatically builds and deploys the latest stable release of OpenClaw** on Railway. No manual version tracking, no stale builds — run the deploy script and you get the newest release from GitHub, built from source, with HTTPS out of the box.
 
 - One command to deploy (`bash scripts/deploy.sh`)
 - Automatically fetches the latest stable OpenClaw tag from GitHub
@@ -28,7 +28,7 @@ Railway is the hosting platform that runs your AI assistant. Your friend needs a
 2. Sign up with **GitHub**, **Google**, or **email** — any method works
 3. Pick the **Hobby** plan ($5/mo) — this is required for deployments
 4. Once you're logged in, go to **https://railway.com/account/tokens**
-5. Click **Create Token** → name it (e.g. `openclaw-deploy`) → copy the token
+5. Click **Create Token** → name it (e.g. `railclaw-deploy`) → copy the token
 6. **Save this token** — you can't view it again after you leave the page
 
 This token lets your friend deploy to your Railway account without needing your password. You can revoke it at any time from the same tokens page.
@@ -50,7 +50,7 @@ OpenRouter gives you access to all the best AI models (GPT-4o, Claude, Gemini, L
    - Add **$5–10** to start (you only pay for what you use)
 3. Create an API key:
    - Go to https://openrouter.ai/settings/keys
-   - Click **Create Key** → name it (e.g. `openclaw`) → copy it
+   - Click **Create Key** → name it (e.g. `railclaw`) → copy it
    - **Save this key** — you'll need it for the setup wizard
 
 ### 3. Get a Brave Search API key
@@ -146,7 +146,7 @@ The setup script can log you in two ways:
 To create an API token:
 1. Log into https://railway.com in any browser
 2. Go to **https://railway.com/account/tokens**
-3. Click **Create Token** → name it (e.g. `openclaw-deploy`) → copy the token
+3. Click **Create Token** → name it (e.g. `railclaw-deploy`) → copy the token
 4. Save it somewhere safe (1Password, etc.) — you can't view it again
 
 #### Step 3: Run the setup script
@@ -154,8 +154,8 @@ To create an API token:
 The setup script handles everything: installs Homebrew and the Railway CLI if needed, logs you in, asks for your password, and deploys.
 
 ```bash
-git clone https://github.com/k7cfo/openclaw-railway-private
-cd openclaw-railway-private
+git clone https://github.com/k7cfo/railclaw
+cd railclaw
 bash scripts/setup.sh
 ```
 
@@ -201,8 +201,8 @@ PROJECT_NAME=mybot bash scripts/deploy.sh
 If you prefer to do it by hand or the scripts don't work for your setup:
 
 ```bash
-git clone https://github.com/k7cfo/openclaw-railway-private
-cd openclaw-railway-private
+git clone https://github.com/k7cfo/railclaw
+cd railclaw
 cp .env.sample .env
 # Edit .env: set SETUP_PASSWORD (and optionally RAILWAY_TOKEN)
 bash scripts/deploy.sh
@@ -316,5 +316,5 @@ Wait for the build to finish (~3–5 min). Check `railway logs` for errors. The 
 
 ## Support
 
-- GitHub Issues: https://github.com/k7cfo/openclaw-railway-private/issues
+- GitHub Issues: https://github.com/k7cfo/railclaw/issues
 - Upstream template: https://github.com/vignesh07/clawdbot-railway-template
